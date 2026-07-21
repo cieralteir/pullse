@@ -62,7 +62,7 @@ describe('mapReviewStates', () => {
 });
 
 describe('getReviewStatus', () => {
-  it("uses each reviewer's latest submitted review state", async () => {
+  it("uses each reviewer's latest submitted review state, ignoring unsubmitted reviews", async () => {
     const octokit = {
       rest: {
         pulls: {
@@ -70,7 +70,7 @@ describe('getReviewStatus', () => {
             data: [
               { user: { login: 'alice' }, state: 'CHANGES_REQUESTED', submitted_at: '2026-01-01T00:00:00Z' },
               { user: { login: 'alice' }, state: 'APPROVED', submitted_at: '2026-01-02T00:00:00Z' },
-              { user: { login: 'bob' }, state: 'PENDING', submitted_at: null },
+              { user: { login: 'bob' }, state: 'CHANGES_REQUESTED', submitted_at: null },
             ],
           }),
         },
@@ -80,6 +80,29 @@ describe('getReviewStatus', () => {
     const status = await getReviewStatus(octokit, 'owner', 'repo', 42);
 
     expect(status).toBe('approved');
+    expect(octokit.rest.pulls.listReviews).toHaveBeenCalledWith({
+      owner: 'owner',
+      repo: 'repo',
+      pull_number: 42,
+    });
+  });
+
+  it('excludes reviewers with only unsubmitted reviews', async () => {
+    const octokit = {
+      rest: {
+        pulls: {
+          listReviews: vi.fn().mockResolvedValue({
+            data: [
+              { user: { login: 'carol' }, state: 'CHANGES_REQUESTED', submitted_at: null },
+            ],
+          }),
+        },
+      },
+    } as unknown as Octokit;
+
+    const status = await getReviewStatus(octokit, 'owner', 'repo', 42);
+
+    expect(status).toBe('pending');
     expect(octokit.rest.pulls.listReviews).toHaveBeenCalledWith({
       owner: 'owner',
       repo: 'repo',
