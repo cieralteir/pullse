@@ -110,3 +110,54 @@ describe('getReviewStatus', () => {
     });
   });
 });
+
+import { getMyOpenPRs } from './github';
+
+describe('getMyOpenPRs', () => {
+  it('maps search results into PR rows and fetches review status for each', async () => {
+    const octokit = {
+      rest: {
+        search: {
+          issuesAndPullRequests: vi.fn().mockResolvedValue({
+            data: {
+              items: [
+                {
+                  id: 1,
+                  number: 7,
+                  title: 'Add feature',
+                  html_url: 'https://github.com/someorg/some-repo/pull/7',
+                  repository_url: 'https://api.github.com/repos/someorg/some-repo',
+                  user: { login: 'me' },
+                  created_at: '2026-01-01T00:00:00Z',
+                },
+              ],
+            },
+          }),
+        },
+        pulls: {
+          listReviews: vi.fn().mockResolvedValue({ data: [] }),
+        },
+      },
+    } as unknown as Octokit;
+
+    const rows = await getMyOpenPRs(octokit);
+
+    expect(rows).toEqual([
+      {
+        id: 1,
+        number: 7,
+        title: 'Add feature',
+        url: 'https://github.com/someorg/some-repo/pull/7',
+        owner: 'someorg',
+        repo: 'some-repo',
+        author: 'me',
+        createdAt: '2026-01-01T00:00:00Z',
+        reviewStatus: 'pending',
+        unread: false,
+      },
+    ]);
+    expect(octokit.rest.search.issuesAndPullRequests).toHaveBeenCalledWith({
+      q: 'is:pr is:open author:@me',
+    });
+  });
+});

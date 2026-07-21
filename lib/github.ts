@@ -1,5 +1,5 @@
 import { Octokit } from '@octokit/rest';
-import type { ReviewStatus } from './github.types';
+import type { ReviewStatus, PRRow } from './github.types';
 
 export class GithubTokenMissingError extends Error {
   constructor() {
@@ -52,4 +52,29 @@ export async function getReviewStatus(
     latestByUser.set(login, review.state); // reviews arrive chronologically; last write wins
   }
   return mapReviewStates(Array.from(latestByUser.values()));
+}
+
+export async function getMyOpenPRs(octokit: Octokit): Promise<PRRow[]> {
+  const { data } = await octokit.rest.search.issuesAndPullRequests({
+    q: 'is:pr is:open author:@me',
+  });
+
+  return Promise.all(
+    data.items.map(async (item): Promise<PRRow> => {
+      const { owner, repo } = parseRepoFromUrl(item.repository_url);
+      const reviewStatus = await getReviewStatus(octokit, owner, repo, item.number);
+      return {
+        id: item.id,
+        number: item.number,
+        title: item.title,
+        url: item.html_url,
+        owner,
+        repo,
+        author: item.user?.login ?? 'unknown',
+        createdAt: item.created_at,
+        reviewStatus,
+        unread: false,
+      };
+    })
+  );
 }
