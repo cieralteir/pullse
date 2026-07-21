@@ -14,3 +14,19 @@ export function getOctokit(): Octokit {
   }
   return new Octokit({ auth: token });
 }
+
+export function parseRepoFromUrl(repositoryUrl: string): { owner: string; repo: string } {
+  const match = repositoryUrl.match(/repos\/([^/]+)\/([^/]+)$/);
+  if (!match) {
+    throw new Error(`Could not parse owner/repo from URL: ${repositoryUrl}`);
+  }
+  return { owner: match[1], repo: match[2] };
+}
+
+export function parsePRNumberFromUrl(url: string): number {
+  const match = url.match(/\/pulls\/(\d+)$/);
+  if (!match) {
+    throw new Error(`Could not parse PR number from URL: ${url}`);
+  }
+  return Number(match[1]);
+}
