@@ -10,7 +10,7 @@ import {
 } from '@/lib/github';
 import { readReposConfig } from '@/lib/repos-config';
 import { describeSectionError } from '@/lib/errors';
-import { StatsBanner } from './components/StatsBanner';
+import { HeroStats } from './components/HeroStats';
 import { PRTable } from './components/PRTable';
 import { RefreshButton } from './components/RefreshButton';
 import { ModeToggle } from '@/components/mode-toggle';
@@ -69,7 +69,6 @@ export default async function Home() {
     myPRsResult.data && unreadResult.data
       ? applyUnreadFlags(myPRsResult.data, unreadResult.data)
       : myPRsResult.data ?? [];
-  const unreadCount = myPRs.filter((pr) => pr.unread).length;
 
   return (
     <main className="mx-auto max-w-5xl space-y-6 p-6">
@@ -81,7 +80,7 @@ export default async function Home() {
         </div>
       </div>
 
-      <StatsBanner totalOpen={myPRs.length} unread={unreadCount} />
+      <HeroStats prs={myPRs} />
 
       <section>
         <h2>My PRs</h2>
