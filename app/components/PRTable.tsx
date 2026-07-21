@@ -1,3 +1,12 @@
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { ReviewStatusBadge } from './ReviewStatusBadge';
 import type { PRRow } from '@/lib/github.types';
 
 interface PRTableProps {
@@ -5,40 +14,40 @@ interface PRTableProps {
   showUnread: boolean;
 }
 
-const REVIEW_LABEL: Record<PRRow['reviewStatus'], string> = {
-  approved: 'Approved',
-  changes_requested: 'Changes requested',
-  pending: 'Pending',
-};
-
 export function PRTable({ rows, showUnread }: PRTableProps) {
   if (rows.length === 0) {
-    return <p>No open PRs.</p>;
+    return <p className="text-sm text-muted-foreground">No open PRs.</p>;
   }
 
   return (
-    <table>
-      <thead>
-        <tr>
-          <th>Title</th>
-          <th>{showUnread ? 'Repo' : 'Author'}</th>
-          <th>Review status</th>
-          <th>{showUnread ? 'Unread' : 'Age'}</th>
-        </tr>
-      </thead>
-      <tbody>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Title</TableHead>
+          <TableHead>{showUnread ? 'Repo' : 'Author'}</TableHead>
+          <TableHead>Review status</TableHead>
+          <TableHead>{showUnread ? 'Unread' : 'Age'}</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
         {rows.map((row) => (
-          <tr key={row.id}>
-            <td>
-              <a href={row.url}>{row.title}</a>
-            </td>
-            <td>{showUnread ? `${row.owner}/${row.repo}` : row.author}</td>
-            <td>{REVIEW_LABEL[row.reviewStatus]}</td>
-            <td>{showUnread ? (row.unread ? 'Unread' : '') : formatAge(row.createdAt)}</td>
-          </tr>
+          <TableRow key={row.id}>
+            <TableCell>
+              <a href={row.url} className="hover:underline">
+                {row.title}
+              </a>
+            </TableCell>
+            <TableCell>{showUnread ? `${row.owner}/${row.repo}` : row.author}</TableCell>
+            <TableCell>
+              <ReviewStatusBadge status={row.reviewStatus} />
+            </TableCell>
+            <TableCell>
+              {showUnread ? (row.unread ? 'Unread' : '') : formatAge(row.createdAt)}
+            </TableCell>
+          </TableRow>
         ))}
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }
 
