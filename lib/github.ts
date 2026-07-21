@@ -1,4 +1,5 @@
 import { Octokit } from '@octokit/rest';
+import type { ReviewStatus } from './github.types';
 
 export class GithubTokenMissingError extends Error {
   constructor() {
@@ -29,4 +30,26 @@ export function parsePRNumberFromUrl(url: string): number {
     throw new Error(`Could not parse PR number from URL: ${url}`);
   }
   return Number(match[1]);
+}
+
+export function mapReviewStates(states: string[]): ReviewStatus {
+  if (states.includes('CHANGES_REQUESTED')) return 'changes_requested';
+  if (states.includes('APPROVED')) return 'approved';
+  return 'pending';
+}
+
+export async function getReviewStatus(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  number: number
+): Promise<ReviewStatus> {
+  const { data } = await octokit.rest.pulls.listReviews({ owner, repo, pull_number: number });
+  const latestByUser = new Map<string, string>();
+  for (const review of data) {
+    const login = review.user?.login;
+    if (!login || !review.submitted_at) continue;
+    latestByUser.set(login, review.state); // reviews arrive chronologically; last write wins
+  }
+  return mapReviewStates(Array.from(latestByUser.values()));
 }

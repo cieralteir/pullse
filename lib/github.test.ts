@@ -1,6 +1,6 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { Octokit } from '@octokit/rest';
-import { getOctokit, GithubTokenMissingError, parseRepoFromUrl, parsePRNumberFromUrl } from './github';
+import { getOctokit, GithubTokenMissingError, parseRepoFromUrl, parsePRNumberFromUrl, mapReviewStates, getReviewStatus } from './github';
 
 describe('getOctokit', () => {
   const originalToken = process.env.GITHUB_TOKEN;
@@ -40,5 +40,50 @@ describe('parsePRNumberFromUrl', () => {
 
   it('throws on an unrecognized URL shape', () => {
     expect(() => parsePRNumberFromUrl('https://api.github.com/repos/someorg/some-repo')).toThrow();
+  });
+});
+
+describe('mapReviewStates', () => {
+  it('returns changes_requested when any state is CHANGES_REQUESTED', () => {
+    expect(mapReviewStates(['APPROVED', 'CHANGES_REQUESTED'])).toBe('changes_requested');
+  });
+
+  it('returns approved when at least one reviewer approved and none requested changes', () => {
+    expect(mapReviewStates(['COMMENTED', 'APPROVED'])).toBe('approved');
+  });
+
+  it('returns pending when there are no approvals or change requests', () => {
+    expect(mapReviewStates(['COMMENTED'])).toBe('pending');
+  });
+
+  it('returns pending when there are no reviews at all', () => {
+    expect(mapReviewStates([])).toBe('pending');
+  });
+});
+
+describe('getReviewStatus', () => {
+  it("uses each reviewer's latest submitted review state", async () => {
+    const octokit = {
+      rest: {
+        pulls: {
+          listReviews: vi.fn().mockResolvedValue({
+            data: [
+              { user: { login: 'alice' }, state: 'CHANGES_REQUESTED', submitted_at: '2026-01-01T00:00:00Z' },
+              { user: { login: 'alice' }, state: 'APPROVED', submitted_at: '2026-01-02T00:00:00Z' },
+              { user: { login: 'bob' }, state: 'PENDING', submitted_at: null },
+            ],
+          }),
+        },
+      },
+    } as unknown as Octokit;
+
+    const status = await getReviewStatus(octokit, 'owner', 'repo', 42);
+
+    expect(status).toBe('approved');
+    expect(octokit.rest.pulls.listReviews).toHaveBeenCalledWith({
+      owner: 'owner',
+      repo: 'repo',
+      pull_number: 42,
+    });
   });
 });
