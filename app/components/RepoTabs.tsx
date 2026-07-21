@@ -30,7 +30,7 @@ export function RepoTabs({ repos, rowsByRepo, errorsByRepo }: RepoTabsProps) {
               <AlertDescription>{errorsByRepo[i]}</AlertDescription>
             </Alert>
           )}
-          <PRTable rows={rowsByRepo[i] ?? []} showUnread={false} />
+          <PRTable rows={rowsByRepo[i] ?? []} showRepo={false} />
         </TabsContent>
       ))}
     </Tabs>

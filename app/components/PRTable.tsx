@@ -11,10 +11,10 @@ import type { PRRow } from '@/lib/github.types';
 
 interface PRTableProps {
   rows: PRRow[];
-  showUnread: boolean;
+  showRepo: boolean;
 }
 
-export function PRTable({ rows, showUnread }: PRTableProps) {
+export function PRTable({ rows, showRepo }: PRTableProps) {
   if (rows.length === 0) {
     return <p className="text-sm text-muted-foreground">No open PRs.</p>;
   }
@@ -23,27 +23,27 @@ export function PRTable({ rows, showUnread }: PRTableProps) {
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Title</TableHead>
-          <TableHead>{showUnread ? 'Repo' : 'Author'}</TableHead>
-          <TableHead>Review status</TableHead>
-          <TableHead>{showUnread ? 'Unread' : 'Age'}</TableHead>
+          <TableHead className="py-1">Title</TableHead>
+          <TableHead className="py-1">{showRepo ? 'Repo' : 'Author'}</TableHead>
+          <TableHead className="py-1">Review status</TableHead>
+          <TableHead className="py-1">Age</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {rows.map((row) => (
           <TableRow key={row.id}>
-            <TableCell>
+            <TableCell className="py-1">
               <a href={row.url} className="hover:underline">
                 {row.title}
               </a>
             </TableCell>
-            <TableCell>{showUnread ? `${row.owner}/${row.repo}` : row.author}</TableCell>
-            <TableCell>
+            <TableCell className="py-1">
+              {showRepo ? `${row.owner}/${row.repo}` : row.author}
+            </TableCell>
+            <TableCell className="py-1">
               <ReviewStatusBadge status={row.reviewStatus} />
             </TableCell>
-            <TableCell>
-              {showUnread ? (row.unread ? 'Unread' : '') : formatAge(row.createdAt)}
-            </TableCell>
+            <TableCell className="py-1">{formatAge(row.createdAt)}</TableCell>
           </TableRow>
         ))}
       </TableBody>

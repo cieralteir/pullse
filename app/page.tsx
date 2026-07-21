@@ -108,7 +108,7 @@ export default async function Home() {
               <AlertDescription>Unread status unavailable: {unreadResult.error}</AlertDescription>
             </Alert>
           )}
-          <PRTable rows={myPRs} showUnread />
+          <PRTable rows={myPRs} showRepo />
         </CardContent>
       </Card>
 
