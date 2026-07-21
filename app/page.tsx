@@ -2,15 +2,12 @@ import {
   getOctokit,
   verifyToken,
   getMyOpenPRs,
-  getUnreadPRs,
   getRepoOpenPRs,
-  applyUnreadFlags,
   GithubTokenMissingError,
   GithubTokenInvalidError,
 } from '@/lib/github';
 import { readReposConfig } from '@/lib/repos-config';
 import { describeSectionError } from '@/lib/errors';
-import { HeroStats } from './components/HeroStats';
 import { PRTable } from './components/PRTable';
 import { RefreshButton } from './components/RefreshButton';
 import { RepoTabs } from './components/RepoTabs';
@@ -70,16 +67,14 @@ export default async function Home() {
 
   const { repos, error: reposError } = readReposConfig();
 
-  const [myPRsResult, unreadResult, ...repoResults] = await Promise.all([
+  const [myPRsResult, ...repoResults] = await Promise.all([
     loadSection<PRRow[]>(() => getMyOpenPRs(octokit)),
-    loadSection(() => getUnreadPRs(octokit)),
     ...repos.map((r) => loadSection<PRRow[]>(() => getRepoOpenPRs(octokit, r.owner, r.repo))),
   ]);
 
-  const myPRs =
-    myPRsResult.data && unreadResult.data
-      ? applyUnreadFlags(myPRsResult.data, unreadResult.data)
-      : myPRsResult.data ?? [];
+  const myPRs = myPRsResult.data ?? [];
+  const approved = myPRs.filter((pr) => pr.reviewStatus === 'approved').length;
+  const changesRequested = myPRs.filter((pr) => pr.reviewStatus === 'changes_requested').length;
 
   return (
     <main className="mx-auto max-w-5xl space-y-6 p-6">
@@ -91,21 +86,17 @@ export default async function Home() {
         </div>
       </div>
 
-      <HeroStats prs={myPRs} />
-
       <Card>
         <CardHeader>
           <CardTitle>My PRs</CardTitle>
+          <CardDescription>
+            {myPRs.length} open · {approved} approved · {changesRequested} changes requested
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {myPRsResult.error && (
             <Alert variant="destructive" role="alert" className="mb-3">
               <AlertDescription>{myPRsResult.error}</AlertDescription>
-            </Alert>
-          )}
-          {unreadResult.error && (
-            <Alert variant="destructive" role="alert" className="mb-3">
-              <AlertDescription>Unread status unavailable: {unreadResult.error}</AlertDescription>
             </Alert>
           )}
           <PRTable rows={myPRs} showRepo />
