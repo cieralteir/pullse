@@ -15,6 +15,7 @@ export function getRateLimitResetMinutes(error: GithubApiErrorLike, now: number)
   const resetHeader = error.response?.headers?.['x-ratelimit-reset'];
   if (!resetHeader) return 1;
   const resetMs = Number(resetHeader) * 1000;
+  if (!Number.isFinite(resetMs)) return 1;
   const minutes = Math.ceil((resetMs - now) / 60000);
   return Math.max(1, minutes);
 }

@@ -38,6 +38,14 @@ describe('getRateLimitResetMinutes', () => {
     );
     expect(minutes).toBe(1); // Should be clamped to 1, not negative or zero
   });
+
+  it('returns 1 minute when the reset header is non-numeric', () => {
+    const minutes = getRateLimitResetMinutes(
+      { status: 403, response: { headers: { 'x-ratelimit-reset': 'not-a-number' } } },
+      Date.now()
+    );
+    expect(minutes).toBe(1);
+  });
 });
 
 describe('describeSectionError', () => {
