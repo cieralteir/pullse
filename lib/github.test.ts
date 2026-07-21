@@ -1,7 +1,17 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { Octokit } from '@octokit/rest';
-import { getOctokit, GithubTokenMissingError, GithubTokenInvalidError, verifyToken, parseRepoFromUrl, parsePRNumberFromUrl, mapReviewStates, getReviewStatus, getMyOpenPRs, getUnreadPRs, applyUnreadFlags, getRepoOpenPRs } from './github';
-import type { PRRow } from './github.types';
+import {
+  getOctokit,
+  GithubTokenMissingError,
+  GithubTokenInvalidError,
+  verifyToken,
+  parseRepoFromUrl,
+  parsePRNumberFromUrl,
+  mapReviewStates,
+  getReviewStatus,
+  getMyOpenPRs,
+  getRepoOpenPRs,
+} from './github';
 
 describe('getOctokit', () => {
   const originalToken = process.env.GITHUB_TOKEN;
@@ -195,7 +205,6 @@ describe('getMyOpenPRs', () => {
         author: 'me',
         createdAt: '2026-01-01T00:00:00Z',
         reviewStatus: 'pending',
-        unread: false,
       },
     ]);
     expect(octokit.rest.search.issuesAndPullRequests).toHaveBeenCalledWith({
@@ -242,41 +251,10 @@ describe('getMyOpenPRs', () => {
         author: 'unknown',
         createdAt: '2026-01-02T00:00:00Z',
         reviewStatus: 'pending',
-        unread: false,
       },
     ]);
     expect(octokit.rest.search.issuesAndPullRequests).toHaveBeenCalledWith({
       q: 'is:pr is:open author:@me',
-    });
-  });
-});
-
-describe('getUnreadPRs', () => {
-  it('returns owner/repo/number keys for unread pull-request notifications only', async () => {
-    const octokit = {
-      rest: {
-        activity: {
-          listNotificationsForAuthenticatedUser: vi.fn().mockResolvedValue({
-            data: [
-              {
-                subject: { type: 'PullRequest', url: 'https://api.github.com/repos/someorg/some-repo/pulls/7' },
-                repository: { owner: { login: 'someorg' }, name: 'some-repo' },
-              },
-              {
-                subject: { type: 'Issue', url: 'https://api.github.com/repos/someorg/some-repo/issues/9' },
-                repository: { owner: { login: 'someorg' }, name: 'some-repo' },
-              },
-            ],
-          }),
-        },
-      },
-    } as unknown as Octokit;
-
-    const keys = await getUnreadPRs(octokit);
-
-    expect(keys).toEqual([{ owner: 'someorg', repo: 'some-repo', number: 7 }]);
-    expect(octokit.rest.activity.listNotificationsForAuthenticatedUser).toHaveBeenCalledWith({
-      all: false,
     });
   });
 });
@@ -316,7 +294,6 @@ describe('getRepoOpenPRs', () => {
         author: 'contributor',
         createdAt: '2026-02-01T00:00:00Z',
         reviewStatus: 'pending',
-        unread: false,
       },
     ]);
     expect(octokit.rest.pulls.list).toHaveBeenCalledWith({
@@ -360,7 +337,6 @@ describe('getRepoOpenPRs', () => {
         author: 'unknown',
         createdAt: '2026-02-02T00:00:00Z',
         reviewStatus: 'pending',
-        unread: false,
       },
     ]);
     expect(octokit.rest.pulls.list).toHaveBeenCalledWith({
@@ -368,35 +344,5 @@ describe('getRepoOpenPRs', () => {
       repo: 'some-repo',
       state: 'open',
     });
-  });
-});
-
-describe('applyUnreadFlags', () => {
-  const basePR: PRRow = {
-    id: 1,
-    number: 7,
-    title: 't',
-    url: 'u',
-    owner: 'someorg',
-    repo: 'some-repo',
-    author: 'me',
-    createdAt: 'c',
-    reviewStatus: 'pending',
-    unread: false,
-  };
-
-  it('marks matching PR rows as unread and leaves the rest untouched', () => {
-    const prs: PRRow[] = [
-      basePR,
-      { ...basePR, id: 2, number: 8 },
-      // Same number as unread key but different repo — must stay false
-      { ...basePR, id: 3, number: 7, repo: 'other-repo' },
-    ];
-
-    const result = applyUnreadFlags(prs, [{ owner: 'someorg', repo: 'some-repo', number: 7 }]);
-
-    expect(result.find((pr) => pr.id === 1)?.unread).toBe(true); // matches: someorg/some-repo#7
-    expect(result.find((pr) => pr.id === 2)?.unread).toBe(false); // number mismatch
-    expect(result.find((pr) => pr.id === 3)?.unread).toBe(false); // repo mismatch despite number match
   });
 });

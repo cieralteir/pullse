@@ -10,16 +10,9 @@ export interface PRRow {
   author: string;
   createdAt: string;
   reviewStatus: ReviewStatus;
-  unread: boolean;
 }
 
 export interface RepoConfig {
   owner: string;
   repo: string;
-}
-
-export interface UnreadPRKey {
-  owner: string;
-  repo: string;
-  number: number;
 }
