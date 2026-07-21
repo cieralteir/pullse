@@ -13,7 +13,9 @@ import { describeSectionError } from '@/lib/errors';
 import { HeroStats } from './components/HeroStats';
 import { PRTable } from './components/PRTable';
 import { RefreshButton } from './components/RefreshButton';
+import { RepoTabs } from './components/RepoTabs';
 import { ModeToggle } from '@/components/mode-toggle';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { PRRow } from '@/lib/github.types';
 
 interface SectionResult<T> {
@@ -89,16 +91,16 @@ export default async function Home() {
         <PRTable rows={myPRs} showUnread />
       </section>
 
-      {reposError && <p role="alert">{reposError}</p>}
-      {repos.map((r, i) => (
-        <section key={`${r.owner}/${r.repo}`}>
-          <h2>
-            {r.owner}/{r.repo}
-          </h2>
-          {repoResults[i].error && <p role="alert">{repoResults[i].error}</p>}
-          <PRTable rows={repoResults[i].data ?? []} showUnread={false} />
-        </section>
-      ))}
+      {reposError && (
+        <Alert variant="destructive" role="alert">
+          <AlertDescription>{reposError}</AlertDescription>
+        </Alert>
+      )}
+      <RepoTabs
+        repos={repos}
+        rowsByRepo={repoResults.map((r) => r.data)}
+        errorsByRepo={repoResults.map((r) => r.error)}
+      />
     </main>
   );
 }
