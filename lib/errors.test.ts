@@ -28,6 +28,16 @@ describe('getRateLimitResetMinutes', () => {
     const minutes = getRateLimitResetMinutes({ status: 403 }, Date.now());
     expect(minutes).toBe(1);
   });
+
+  it('returns at least 1 minute when the reset timestamp is in the past', () => {
+    const now = Date.parse('2026-01-01T00:00:00Z');
+    const resetSeconds = Math.floor(now / 1000) - 30; // 30 seconds ago (in the past)
+    const minutes = getRateLimitResetMinutes(
+      { status: 403, response: { headers: { 'x-ratelimit-reset': String(resetSeconds) } } },
+      now
+    );
+    expect(minutes).toBe(1); // Should be clamped to 1, not negative or zero
+  });
 });
 
 describe('describeSectionError', () => {
