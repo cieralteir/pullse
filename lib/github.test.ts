@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { Octokit } from '@octokit/rest';
-import { getOctokit, GithubTokenMissingError, parseRepoFromUrl, parsePRNumberFromUrl, mapReviewStates, getReviewStatus, getMyOpenPRs } from './github';
+import { getOctokit, GithubTokenMissingError, parseRepoFromUrl, parsePRNumberFromUrl, mapReviewStates, getReviewStatus, getMyOpenPRs, getUnreadPRs, applyUnreadFlags } from './github';
+import type { PRRow } from './github.types';
 
 describe('getOctokit', () => {
   const originalToken = process.env.GITHUB_TOKEN;
@@ -204,5 +205,59 @@ describe('getMyOpenPRs', () => {
     expect(octokit.rest.search.issuesAndPullRequests).toHaveBeenCalledWith({
       q: 'is:pr is:open author:@me',
     });
+  });
+});
+
+describe('getUnreadPRs', () => {
+  it('returns owner/repo/number keys for unread pull-request notifications only', async () => {
+    const octokit = {
+      rest: {
+        activity: {
+          listNotificationsForAuthenticatedUser: vi.fn().mockResolvedValue({
+            data: [
+              {
+                subject: { type: 'PullRequest', url: 'https://api.github.com/repos/someorg/some-repo/pulls/7' },
+                repository: { owner: { login: 'someorg' }, name: 'some-repo' },
+              },
+              {
+                subject: { type: 'Issue', url: 'https://api.github.com/repos/someorg/some-repo/issues/9' },
+                repository: { owner: { login: 'someorg' }, name: 'some-repo' },
+              },
+            ],
+          }),
+        },
+      },
+    } as unknown as Octokit;
+
+    const keys = await getUnreadPRs(octokit);
+
+    expect(keys).toEqual([{ owner: 'someorg', repo: 'some-repo', number: 7 }]);
+    expect(octokit.rest.activity.listNotificationsForAuthenticatedUser).toHaveBeenCalledWith({
+      all: false,
+    });
+  });
+});
+
+describe('applyUnreadFlags', () => {
+  const basePR: PRRow = {
+    id: 1,
+    number: 7,
+    title: 't',
+    url: 'u',
+    owner: 'someorg',
+    repo: 'some-repo',
+    author: 'me',
+    createdAt: 'c',
+    reviewStatus: 'pending',
+    unread: false,
+  };
+
+  it('marks matching PR rows as unread and leaves the rest untouched', () => {
+    const prs: PRRow[] = [basePR, { ...basePR, id: 2, number: 8 }];
+
+    const result = applyUnreadFlags(prs, [{ owner: 'someorg', repo: 'some-repo', number: 7 }]);
+
+    expect(result.find((pr) => pr.number === 7)?.unread).toBe(true);
+    expect(result.find((pr) => pr.number === 8)?.unread).toBe(false);
   });
 });

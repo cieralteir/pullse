@@ -1,5 +1,5 @@
 import { Octokit } from '@octokit/rest';
-import type { ReviewStatus, PRRow } from './github.types';
+import type { ReviewStatus, PRRow, UnreadPRKey } from './github.types';
 
 export class GithubTokenMissingError extends Error {
   constructor() {
@@ -77,4 +77,29 @@ export async function getMyOpenPRs(octokit: Octokit): Promise<PRRow[]> {
       };
     })
   );
+}
+
+export async function getUnreadPRs(octokit: Octokit): Promise<UnreadPRKey[]> {
+  const { data } = await octokit.rest.activity.listNotificationsForAuthenticatedUser({
+    all: false,
+  });
+
+  const keys: UnreadPRKey[] = [];
+  for (const notification of data) {
+    if (notification.subject.type !== 'PullRequest') continue;
+    keys.push({
+      owner: notification.repository.owner.login,
+      repo: notification.repository.name,
+      number: parsePRNumberFromUrl(notification.subject.url),
+    });
+  }
+  return keys;
+}
+
+export function applyUnreadFlags(prs: PRRow[], unread: UnreadPRKey[]): PRRow[] {
+  const unreadSet = new Set(unread.map((u) => `${u.owner}/${u.repo}#${u.number}`));
+  return prs.map((pr) => ({
+    ...pr,
+    unread: unreadSet.has(`${pr.owner}/${pr.repo}#${pr.number}`),
+  }));
 }
