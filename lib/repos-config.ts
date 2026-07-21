@@ -15,10 +15,17 @@ export function readReposConfig(
   let raw: string;
   try {
     raw = readFileSync(configPath, 'utf-8');
-  } catch {
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') {
+      return {
+        repos: [],
+        error: `No ${CONFIG_FILENAME} found in project root. Add one to track repos.`,
+      };
+    }
     return {
       repos: [],
-      error: `No ${CONFIG_FILENAME} found in project root. Add one to track repos.`,
+      error: `Could not read ${CONFIG_FILENAME}: ${code ?? 'unknown error'}.`,
     };
   }
 

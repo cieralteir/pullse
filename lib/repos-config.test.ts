@@ -49,4 +49,13 @@ describe('readReposConfig', () => {
     expect(result.repos).toEqual([]);
     expect(result.error).toMatch(/must be an array/);
   });
+
+  it('returns a distinct error message for non-ENOENT read failures (e.g. EISDIR)', () => {
+    dir = mkdtempSync(path.join(tmpdir(), 'pullse-test-'));
+    // Point configPath at a directory instead of a file, which typically produces EISDIR on read.
+    const result = readReposConfig(dir);
+    expect(result.repos).toEqual([]);
+    expect(result.error).toMatch(/Could not read repos\.config\.json/);
+    expect(result.error).not.toMatch(/No repos\.config\.json found/);
+  });
 });
