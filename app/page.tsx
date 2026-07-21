@@ -55,7 +55,7 @@ export default async function Home() {
               <CardTitle>pullse</CardTitle>
               <CardDescription>
                 GITHUB_TOKEN in .env.local was rejected by GitHub. Check that it&apos;s valid and
-                has repo/notifications read scopes.
+                has repo read scope.
               </CardDescription>
             </CardHeader>
           </Card>
