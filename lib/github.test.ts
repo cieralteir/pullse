@@ -253,11 +253,17 @@ describe('applyUnreadFlags', () => {
   };
 
   it('marks matching PR rows as unread and leaves the rest untouched', () => {
-    const prs: PRRow[] = [basePR, { ...basePR, id: 2, number: 8 }];
+    const prs: PRRow[] = [
+      basePR,
+      { ...basePR, id: 2, number: 8 },
+      // Same number as unread key but different repo — must stay false
+      { ...basePR, id: 3, number: 7, repo: 'other-repo' },
+    ];
 
     const result = applyUnreadFlags(prs, [{ owner: 'someorg', repo: 'some-repo', number: 7 }]);
 
-    expect(result.find((pr) => pr.number === 7)?.unread).toBe(true);
-    expect(result.find((pr) => pr.number === 8)?.unread).toBe(false);
+    expect(result.find((pr) => pr.id === 1)?.unread).toBe(true); // matches: someorg/some-repo#7
+    expect(result.find((pr) => pr.id === 2)?.unread).toBe(false); // number mismatch
+    expect(result.find((pr) => pr.id === 3)?.unread).toBe(false); // repo mismatch despite number match
   });
 });
