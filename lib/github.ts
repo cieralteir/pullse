@@ -8,12 +8,30 @@ export class GithubTokenMissingError extends Error {
   }
 }
 
+export class GithubTokenInvalidError extends Error {
+  constructor() {
+    super('GITHUB_TOKEN was rejected by GitHub (401)');
+    this.name = 'GithubTokenInvalidError';
+  }
+}
+
 export function getOctokit(): Octokit {
   const token = process.env.GITHUB_TOKEN;
   if (!token) {
     throw new GithubTokenMissingError();
   }
   return new Octokit({ auth: token });
+}
+
+export async function verifyToken(octokit: Octokit): Promise<void> {
+  try {
+    await octokit.rest.users.getAuthenticated();
+  } catch (error) {
+    if (typeof error === 'object' && error !== null && (error as { status?: unknown }).status === 401) {
+      throw new GithubTokenInvalidError();
+    }
+    throw error;
+  }
 }
 
 export function parseRepoFromUrl(repositoryUrl: string): { owner: string; repo: string } {
@@ -59,6 +77,8 @@ export async function getMyOpenPRs(octokit: Octokit): Promise<PRRow[]> {
     q: 'is:pr is:open author:@me',
   });
 
+  // Intentional N+1 fan-out: one review-status call per PR, fine at this app's scale (personal
+  // tool, small PR counts). Neither pulls.list nor the search API paginate beyond GitHub's default page size.
   return Promise.all(
     data.items.map(async (item): Promise<PRRow> => {
       const { owner, repo } = parseRepoFromUrl(item.repository_url);

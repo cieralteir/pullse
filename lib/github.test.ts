@@ -1,13 +1,17 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { Octokit } from '@octokit/rest';
-import { getOctokit, GithubTokenMissingError, parseRepoFromUrl, parsePRNumberFromUrl, mapReviewStates, getReviewStatus, getMyOpenPRs, getUnreadPRs, applyUnreadFlags, getRepoOpenPRs } from './github';
+import { getOctokit, GithubTokenMissingError, GithubTokenInvalidError, verifyToken, parseRepoFromUrl, parsePRNumberFromUrl, mapReviewStates, getReviewStatus, getMyOpenPRs, getUnreadPRs, applyUnreadFlags, getRepoOpenPRs } from './github';
 import type { PRRow } from './github.types';
 
 describe('getOctokit', () => {
   const originalToken = process.env.GITHUB_TOKEN;
 
   afterEach(() => {
-    process.env.GITHUB_TOKEN = originalToken;
+    if (originalToken === undefined) {
+      delete process.env.GITHUB_TOKEN;
+    } else {
+      process.env.GITHUB_TOKEN = originalToken;
+    }
   });
 
   it('throws GithubTokenMissingError when GITHUB_TOKEN is not set', () => {
@@ -18,6 +22,45 @@ describe('getOctokit', () => {
   it('constructs an Octokit client when GITHUB_TOKEN is set', () => {
     process.env.GITHUB_TOKEN = 'test-token';
     expect(getOctokit()).toBeInstanceOf(Octokit);
+  });
+});
+
+describe('verifyToken', () => {
+  it('resolves cleanly when the auth check succeeds', async () => {
+    const octokit = {
+      rest: {
+        users: {
+          getAuthenticated: vi.fn().mockResolvedValue({ data: { login: 'me' } }),
+        },
+      },
+    } as unknown as Octokit;
+
+    await expect(verifyToken(octokit)).resolves.toBeUndefined();
+  });
+
+  it('throws GithubTokenInvalidError when the auth check rejects with status 401', async () => {
+    const octokit = {
+      rest: {
+        users: {
+          getAuthenticated: vi.fn().mockRejectedValue({ status: 401 }),
+        },
+      },
+    } as unknown as Octokit;
+
+    await expect(verifyToken(octokit)).rejects.toThrow(GithubTokenInvalidError);
+  });
+
+  it('rethrows the original error unchanged for non-401 failures', async () => {
+    const originalError = { status: 500, message: 'server error' };
+    const octokit = {
+      rest: {
+        users: {
+          getAuthenticated: vi.fn().mockRejectedValue(originalError),
+        },
+      },
+    } as unknown as Octokit;
+
+    await expect(verifyToken(octokit)).rejects.toBe(originalError);
   });
 });
 

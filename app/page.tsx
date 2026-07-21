@@ -1,10 +1,12 @@
 import {
   getOctokit,
+  verifyToken,
   getMyOpenPRs,
   getUnreadPRs,
   getRepoOpenPRs,
   applyUnreadFlags,
   GithubTokenMissingError,
+  GithubTokenInvalidError,
 } from '@/lib/github';
 import { readReposConfig } from '@/lib/repos-config';
 import { describeSectionError } from '@/lib/errors';
@@ -30,12 +32,24 @@ export default async function Home() {
   let octokit;
   try {
     octokit = getOctokit();
+    await verifyToken(octokit);
   } catch (error) {
     if (error instanceof GithubTokenMissingError) {
       return (
         <main>
           <h1>pullse</h1>
           <p>Set GITHUB_TOKEN in .env.local to get started.</p>
+        </main>
+      );
+    }
+    if (error instanceof GithubTokenInvalidError) {
+      return (
+        <main>
+          <h1>pullse</h1>
+          <p>
+            GITHUB_TOKEN in .env.local was rejected by GitHub. Check that it&apos;s valid and has
+            repo/notifications read scopes.
+          </p>
         </main>
       );
     }
