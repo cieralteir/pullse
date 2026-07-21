@@ -1,6 +1,6 @@
-import './globals.css';
-
 import type { ReactNode } from 'react';
+import { ThemeProvider } from '@/components/theme-provider';
+import './globals.css';
 
 export const metadata = {
   title: 'pullse',
@@ -8,8 +8,12 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <body>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          {children}
+        </ThemeProvider>
+      </body>
     </html>
   );
 }

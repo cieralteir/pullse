@@ -13,6 +13,7 @@ import { describeSectionError } from '@/lib/errors';
 import { StatsBanner } from './components/StatsBanner';
 import { PRTable } from './components/PRTable';
 import { RefreshButton } from './components/RefreshButton';
+import { ModeToggle } from '@/components/mode-toggle';
 import type { PRRow } from '@/lib/github.types';
 
 interface SectionResult<T> {
@@ -71,10 +72,13 @@ export default async function Home() {
   const unreadCount = myPRs.filter((pr) => pr.unread).length;
 
   return (
-    <main>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1>pullse</h1>
-        <RefreshButton />
+    <main className="mx-auto max-w-5xl space-y-6 p-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">pullse</h1>
+        <div className="flex items-center gap-2">
+          <ModeToggle />
+          <RefreshButton />
+        </div>
       </div>
 
       <StatsBanner totalOpen={myPRs.length} unread={unreadCount} />
