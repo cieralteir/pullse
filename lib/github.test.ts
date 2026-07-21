@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { Octokit } from '@octokit/rest';
-import { getOctokit, GithubTokenMissingError, parseRepoFromUrl, parsePRNumberFromUrl, mapReviewStates, getReviewStatus } from './github';
+import { getOctokit, GithubTokenMissingError, parseRepoFromUrl, parsePRNumberFromUrl, mapReviewStates, getReviewStatus, getMyOpenPRs } from './github';
 
 describe('getOctokit', () => {
   const originalToken = process.env.GITHUB_TOKEN;
@@ -111,8 +111,6 @@ describe('getReviewStatus', () => {
   });
 });
 
-import { getMyOpenPRs } from './github';
-
 describe('getMyOpenPRs', () => {
   it('maps search results into PR rows and fetches review status for each', async () => {
     const octokit = {
@@ -152,6 +150,53 @@ describe('getMyOpenPRs', () => {
         repo: 'some-repo',
         author: 'me',
         createdAt: '2026-01-01T00:00:00Z',
+        reviewStatus: 'pending',
+        unread: false,
+      },
+    ]);
+    expect(octokit.rest.search.issuesAndPullRequests).toHaveBeenCalledWith({
+      q: 'is:pr is:open author:@me',
+    });
+  });
+
+  it('uses "unknown" as author when user data is missing', async () => {
+    const octokit = {
+      rest: {
+        search: {
+          issuesAndPullRequests: vi.fn().mockResolvedValue({
+            data: {
+              items: [
+                {
+                  id: 2,
+                  number: 8,
+                  title: 'Fix bug',
+                  html_url: 'https://github.com/someorg/some-repo/pull/8',
+                  repository_url: 'https://api.github.com/repos/someorg/some-repo',
+                  user: null,
+                  created_at: '2026-01-02T00:00:00Z',
+                },
+              ],
+            },
+          }),
+        },
+        pulls: {
+          listReviews: vi.fn().mockResolvedValue({ data: [] }),
+        },
+      },
+    } as unknown as Octokit;
+
+    const rows = await getMyOpenPRs(octokit);
+
+    expect(rows).toEqual([
+      {
+        id: 2,
+        number: 8,
+        title: 'Fix bug',
+        url: 'https://github.com/someorg/some-repo/pull/8',
+        owner: 'someorg',
+        repo: 'some-repo',
+        author: 'unknown',
+        createdAt: '2026-01-02T00:00:00Z',
         reviewStatus: 'pending',
         unread: false,
       },
