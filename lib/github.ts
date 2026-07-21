@@ -96,6 +96,32 @@ export async function getUnreadPRs(octokit: Octokit): Promise<UnreadPRKey[]> {
   return keys;
 }
 
+export async function getRepoOpenPRs(
+  octokit: Octokit,
+  owner: string,
+  repo: string
+): Promise<PRRow[]> {
+  const { data } = await octokit.rest.pulls.list({ owner, repo, state: 'open' });
+
+  return Promise.all(
+    data.map(async (pr): Promise<PRRow> => {
+      const reviewStatus = await getReviewStatus(octokit, owner, repo, pr.number);
+      return {
+        id: pr.id,
+        number: pr.number,
+        title: pr.title,
+        url: pr.html_url,
+        owner,
+        repo,
+        author: pr.user?.login ?? 'unknown',
+        createdAt: pr.created_at,
+        reviewStatus,
+        unread: false,
+      };
+    })
+  );
+}
+
 export function applyUnreadFlags(prs: PRRow[], unread: UnreadPRKey[]): PRRow[] {
   const unreadSet = new Set(unread.map((u) => `${u.owner}/${u.repo}#${u.number}`));
   return prs.map((pr) => ({

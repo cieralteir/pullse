@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { Octokit } from '@octokit/rest';
-import { getOctokit, GithubTokenMissingError, parseRepoFromUrl, parsePRNumberFromUrl, mapReviewStates, getReviewStatus, getMyOpenPRs, getUnreadPRs, applyUnreadFlags } from './github';
+import { getOctokit, GithubTokenMissingError, parseRepoFromUrl, parsePRNumberFromUrl, mapReviewStates, getReviewStatus, getMyOpenPRs, getUnreadPRs, applyUnreadFlags, getRepoOpenPRs } from './github';
 import type { PRRow } from './github.types';
 
 describe('getOctokit', () => {
@@ -234,6 +234,96 @@ describe('getUnreadPRs', () => {
     expect(keys).toEqual([{ owner: 'someorg', repo: 'some-repo', number: 7 }]);
     expect(octokit.rest.activity.listNotificationsForAuthenticatedUser).toHaveBeenCalledWith({
       all: false,
+    });
+  });
+});
+
+describe('getRepoOpenPRs', () => {
+  it('maps a repo\'s open PRs into PR rows', async () => {
+    const octokit = {
+      rest: {
+        pulls: {
+          list: vi.fn().mockResolvedValue({
+            data: [
+              {
+                id: 5,
+                number: 12,
+                title: 'Fix bug',
+                html_url: 'https://github.com/someorg/some-repo/pull/12',
+                user: { login: 'contributor' },
+                created_at: '2026-02-01T00:00:00Z',
+              },
+            ],
+          }),
+          listReviews: vi.fn().mockResolvedValue({ data: [] }),
+        },
+      },
+    } as unknown as Octokit;
+
+    const rows = await getRepoOpenPRs(octokit, 'someorg', 'some-repo');
+
+    expect(rows).toEqual([
+      {
+        id: 5,
+        number: 12,
+        title: 'Fix bug',
+        url: 'https://github.com/someorg/some-repo/pull/12',
+        owner: 'someorg',
+        repo: 'some-repo',
+        author: 'contributor',
+        createdAt: '2026-02-01T00:00:00Z',
+        reviewStatus: 'pending',
+        unread: false,
+      },
+    ]);
+    expect(octokit.rest.pulls.list).toHaveBeenCalledWith({
+      owner: 'someorg',
+      repo: 'some-repo',
+      state: 'open',
+    });
+  });
+
+  it('uses "unknown" as author when user data is null', async () => {
+    const octokit = {
+      rest: {
+        pulls: {
+          list: vi.fn().mockResolvedValue({
+            data: [
+              {
+                id: 6,
+                number: 13,
+                title: 'Another PR',
+                html_url: 'https://github.com/someorg/some-repo/pull/13',
+                user: null,
+                created_at: '2026-02-02T00:00:00Z',
+              },
+            ],
+          }),
+          listReviews: vi.fn().mockResolvedValue({ data: [] }),
+        },
+      },
+    } as unknown as Octokit;
+
+    const rows = await getRepoOpenPRs(octokit, 'someorg', 'some-repo');
+
+    expect(rows).toEqual([
+      {
+        id: 6,
+        number: 13,
+        title: 'Another PR',
+        url: 'https://github.com/someorg/some-repo/pull/13',
+        owner: 'someorg',
+        repo: 'some-repo',
+        author: 'unknown',
+        createdAt: '2026-02-02T00:00:00Z',
+        reviewStatus: 'pending',
+        unread: false,
+      },
+    ]);
+    expect(octokit.rest.pulls.list).toHaveBeenCalledWith({
+      owner: 'someorg',
+      repo: 'some-repo',
+      state: 'open',
     });
   });
 });
