@@ -16,6 +16,7 @@ import { RefreshButton } from './components/RefreshButton';
 import { RepoTabs } from './components/RepoTabs';
 import { ModeToggle } from '@/components/mode-toggle';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type { PRRow } from '@/lib/github.types';
 
 interface SectionResult<T> {
@@ -39,20 +40,28 @@ export default async function Home() {
   } catch (error) {
     if (error instanceof GithubTokenMissingError) {
       return (
-        <main>
-          <h1>pullse</h1>
-          <p>Set GITHUB_TOKEN in .env.local to get started.</p>
+        <main className="mx-auto max-w-3xl p-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>pullse</CardTitle>
+              <CardDescription>Set GITHUB_TOKEN in .env.local to get started.</CardDescription>
+            </CardHeader>
+          </Card>
         </main>
       );
     }
     if (error instanceof GithubTokenInvalidError) {
       return (
-        <main>
-          <h1>pullse</h1>
-          <p>
-            GITHUB_TOKEN in .env.local was rejected by GitHub. Check that it&apos;s valid and has
-            repo/notifications read scopes.
-          </p>
+        <main className="mx-auto max-w-3xl p-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>pullse</CardTitle>
+              <CardDescription>
+                GITHUB_TOKEN in .env.local was rejected by GitHub. Check that it&apos;s valid and
+                has repo/notifications read scopes.
+              </CardDescription>
+            </CardHeader>
+          </Card>
         </main>
       );
     }
@@ -84,12 +93,24 @@ export default async function Home() {
 
       <HeroStats prs={myPRs} />
 
-      <section>
-        <h2>My PRs</h2>
-        {myPRsResult.error && <p role="alert">{myPRsResult.error}</p>}
-        {unreadResult.error && <p role="alert">Unread status unavailable: {unreadResult.error}</p>}
-        <PRTable rows={myPRs} showUnread />
-      </section>
+      <Card>
+        <CardHeader>
+          <CardTitle>My PRs</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {myPRsResult.error && (
+            <Alert variant="destructive" role="alert" className="mb-3">
+              <AlertDescription>{myPRsResult.error}</AlertDescription>
+            </Alert>
+          )}
+          {unreadResult.error && (
+            <Alert variant="destructive" role="alert" className="mb-3">
+              <AlertDescription>Unread status unavailable: {unreadResult.error}</AlertDescription>
+            </Alert>
+          )}
+          <PRTable rows={myPRs} showUnread />
+        </CardContent>
+      </Card>
 
       {reposError && (
         <Alert variant="destructive" role="alert">
