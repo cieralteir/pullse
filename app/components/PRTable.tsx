@@ -20,24 +20,24 @@ export function PRTable({ rows, showRepo }: PRTableProps) {
   }
 
   return (
-    <Table>
+    <Table className="table-fixed">
       <TableHeader>
         <TableRow>
-          <TableHead className="py-1">Title</TableHead>
-          <TableHead className="py-1">{showRepo ? 'Repo' : 'Author'}</TableHead>
-          <TableHead className="py-1">Review status</TableHead>
-          <TableHead className="py-1">Age</TableHead>
+          <TableHead className="py-1 w-[45%]">Title</TableHead>
+          <TableHead className="py-1 w-[25%]">{showRepo ? 'Repo' : 'Author'}</TableHead>
+          <TableHead className="py-1 w-[18%]">Review status</TableHead>
+          <TableHead className="py-1 w-[12%]">Age</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {rows.map((row) => (
           <TableRow key={row.id}>
-            <TableCell className="py-1">
-              <a href={row.url} className="hover:underline">
+            <TableCell className="py-1 align-top">
+              <a href={row.url} className="line-clamp-2 whitespace-normal break-words hover:underline">
                 {row.title}
               </a>
             </TableCell>
-            <TableCell className="py-1">
+            <TableCell className="py-1 truncate">
               {showRepo ? `${row.owner}/${row.repo}` : row.author}
             </TableCell>
             <TableCell className="py-1">
