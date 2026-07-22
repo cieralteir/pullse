@@ -20,7 +20,12 @@ export function getOctokit(): Octokit {
   if (!token) {
     throw new GithubTokenMissingError();
   }
-  return new Octokit({ auth: token });
+  return new Octokit({
+    auth: token,
+    request: {
+      fetch: (url: string, opts: RequestInit) => fetch(url, { ...opts, cache: 'no-store' }),
+    },
+  });
 }
 
 export async function verifyToken(octokit: Octokit): Promise<void> {
