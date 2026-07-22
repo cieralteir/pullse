@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { Octokit } from '@octokit/rest';
+import type { RepoConfig } from './github.types';
 import {
   getOctokit,
   GithubTokenMissingError,
@@ -253,6 +254,49 @@ describe('getMyOpenPRs', () => {
         reviewStatus: 'pending',
       },
     ]);
+    expect(octokit.rest.search.issuesAndPullRequests).toHaveBeenCalledWith({
+      q: 'is:pr is:open author:@me',
+    });
+  });
+
+  it('scopes the search query to configured repos when provided', async () => {
+    const octokit = {
+      rest: {
+        search: {
+          issuesAndPullRequests: vi.fn().mockResolvedValue({ data: { items: [] } }),
+        },
+        pulls: {
+          listReviews: vi.fn().mockResolvedValue({ data: [] }),
+        },
+      },
+    } as unknown as Octokit;
+
+    const repos: RepoConfig[] = [
+      { owner: 'someorg', repo: 'some-repo' },
+      { owner: 'otherorg', repo: 'other-repo' },
+    ];
+
+    await getMyOpenPRs(octokit, repos);
+
+    expect(octokit.rest.search.issuesAndPullRequests).toHaveBeenCalledWith({
+      q: 'is:pr is:open author:@me repo:someorg/some-repo repo:otherorg/other-repo',
+    });
+  });
+
+  it('uses the unscoped query when the repo list is empty', async () => {
+    const octokit = {
+      rest: {
+        search: {
+          issuesAndPullRequests: vi.fn().mockResolvedValue({ data: { items: [] } }),
+        },
+        pulls: {
+          listReviews: vi.fn().mockResolvedValue({ data: [] }),
+        },
+      },
+    } as unknown as Octokit;
+
+    await getMyOpenPRs(octokit, []);
+
     expect(octokit.rest.search.issuesAndPullRequests).toHaveBeenCalledWith({
       q: 'is:pr is:open author:@me',
     });

@@ -1,5 +1,5 @@
 import { Octokit } from '@octokit/rest';
-import type { ReviewStatus, PRRow } from './github.types';
+import type { ReviewStatus, PRRow, RepoConfig } from './github.types';
 
 export class GithubTokenMissingError extends Error {
   constructor() {
@@ -72,9 +72,10 @@ export async function getReviewStatus(
   return mapReviewStates(Array.from(latestByUser.values()));
 }
 
-export async function getMyOpenPRs(octokit: Octokit): Promise<PRRow[]> {
+export async function getMyOpenPRs(octokit: Octokit, repos: RepoConfig[] = []): Promise<PRRow[]> {
+  const repoQualifiers = repos.map((r) => ` repo:${r.owner}/${r.repo}`).join('');
   const { data } = await octokit.rest.search.issuesAndPullRequests({
-    q: 'is:pr is:open author:@me',
+    q: `is:pr is:open author:@me${repoQualifiers}`,
   });
 
   // Intentional N+1 fan-out: one review-status call per PR, fine at this app's scale (personal
