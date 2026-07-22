@@ -6,7 +6,7 @@ import {
   GithubTokenMissingError,
   GithubTokenInvalidError,
 } from '@/lib/github';
-import { readReposConfig } from '@/lib/repos-config';
+import { readReposConfig, readMyPRsReposConfig } from '@/lib/repos-config';
 import { describeSectionError } from '@/lib/errors';
 import { PRTable } from './components/PRTable';
 import { RefreshButton } from './components/RefreshButton';
@@ -66,9 +66,10 @@ export default async function Home() {
   }
 
   const { repos, error: reposError } = readReposConfig();
+  const { repos: myPRsRepos, error: myPRsReposError } = readMyPRsReposConfig();
 
   const [myPRsResult, ...repoResults] = await Promise.all([
-    loadSection<PRRow[]>(() => getMyOpenPRs(octokit)),
+    loadSection<PRRow[]>(() => getMyOpenPRs(octokit, myPRsRepos)),
     ...repos.map((r) => loadSection<PRRow[]>(() => getRepoOpenPRs(octokit, r.owner, r.repo))),
   ]);
 
@@ -94,6 +95,11 @@ export default async function Home() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {myPRsReposError && (
+            <Alert variant="destructive" role="alert" className="mb-3">
+              <AlertDescription>{myPRsReposError}</AlertDescription>
+            </Alert>
+          )}
           {myPRsResult.error && (
             <Alert variant="destructive" role="alert" className="mb-3">
               <AlertDescription>{myPRsResult.error}</AlertDescription>
