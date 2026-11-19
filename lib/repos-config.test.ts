@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { readReposConfig, readMyPRsReposConfig } from './repos-config';
+import { readReposConfig, readMyPRsReposConfig, parseReposEnv } from './repos-config';
 
 let dir: string | undefined;
 
@@ -119,5 +119,56 @@ describe('readMyPRsReposConfig', () => {
     const result = readMyPRsReposConfig(configPath);
     expect(result.repos).toEqual([]);
     expect(result.error).toMatch(/not valid JSON/);
+  });
+});
+
+describe('readReposConfig with .env placeholders', () => {
+  afterEach(() => {
+    delete process.env.PULLSE_TEST_REPOS;
+    delete process.env.PULLSE_TEST_OWNER;
+  });
+
+  it('fills "${VAR}" string entries from the environment', () => {
+    process.env.PULLSE_TEST_REPOS = 'someorg/a,someorg/b';
+    const configPath = writeConfig('["${PULLSE_TEST_REPOS}"]');
+    expect(readReposConfig(configPath)).toEqual({
+      repos: [
+        { owner: 'someorg', repo: 'a' },
+        { owner: 'someorg', repo: 'b' },
+      ],
+      error: null,
+    });
+  });
+
+  it('fills placeholders inside object entries', () => {
+    process.env.PULLSE_TEST_OWNER = 'someorg';
+    const configPath = writeConfig('[{ "owner": "${PULLSE_TEST_OWNER}", "repo": "a" }]');
+    expect(readReposConfig(configPath)).toEqual({
+      repos: [{ owner: 'someorg', repo: 'a' }],
+      error: null,
+    });
+  });
+
+  it('returns an empty list when the variable is unset', () => {
+    const configPath = writeConfig('["${PULLSE_TEST_REPOS}"]');
+    expect(readReposConfig(configPath)).toEqual({ repos: [], error: null });
+  });
+});
+
+describe('parseReposEnv', () => {
+  it('parses a comma-separated owner/repo list', () => {
+    expect(parseReposEnv('someorg/a, someorg/b')).toEqual({
+      repos: [
+        { owner: 'someorg', repo: 'a' },
+        { owner: 'someorg', repo: 'b' },
+      ],
+      error: null,
+    });
+  });
+
+  it('returns an error for malformed entries', () => {
+    const result = parseReposEnv('someorg/a,bad-entry');
+    expect(result.repos).toEqual([]);
+    expect(result.error).toMatch(/GITHUB_REPOS must be/);
   });
 });

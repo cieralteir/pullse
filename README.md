@@ -5,14 +5,12 @@ A single-user, local-only GitHub PR tracker. See `docs/superpowers/specs/2026-07
 ## Setup
 
 1. Copy `.env.local.example` to `.env.local` and set `GITHUB_TOKEN` to a GitHub personal access token with `repo` and `notifications` read scopes.
-2. Edit `repos.config.json` to list the repos you want a section for:
-   ```json
-   [
-     { "owner": "someorg", "repo": "some-repo" }
-   ]
+2. In `.env.local`, set `GITHUB_REPOS` to a comma-separated list of the repos you want a section for:
    ```
-3. Optionally add `my-prs.config.json` (same format) to restrict the My PRs search to specific repos. If it's missing or empty, My PRs searches every repo your token can see.
-4. Run `npm install`, then `npm run dev`, and open http://localhost:3000.
+   GITHUB_REPOS=someorg/some-repo,someorg/other-repo
+   ```
+   `repos.config.json` is committed and holds only `${GITHUB_REPOS}`; it is filled from `.env.local` at runtime, so repo names never land in git. Entries can also be literal `{ "owner", "repo" }` objects or `"owner/repo"` strings, and any string may reference another `${VAR}`.
+3. Run `npm install`, then `npm run dev`, and open http://localhost:3000.
 
 ## Tests
 

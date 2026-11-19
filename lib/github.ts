@@ -1,5 +1,5 @@
 import { Octokit } from '@octokit/rest';
-import type { ReviewStatus, PRRow, RepoConfig } from './github.types';
+import type { ReviewStatus, MergeState, MergeInfo, PRRow, RepoConfig } from './github.types';
 
 export class GithubTokenMissingError extends Error {
   constructor() {
@@ -55,6 +55,20 @@ export function parsePRNumberFromUrl(url: string): number {
   return Number(match[1]);
 }
 
+// Jira keys look like CW-1234 or NXS2-1035: an uppercase project key followed by a number.
+// Uppercase-only keeps false positives out of titles (e.g. "utf-8" won't match).
+const TICKET_KEY_RE = /\b[A-Z][A-Z0-9]+-\d+\b/;
+
+// Returns the first ticket key found across the given sources, in order. Pass the branch
+// name first and the title second to get "branch, fallback to title" behavior.
+export function extractTicketKey(...sources: Array<string | null | undefined>): string | null {
+  for (const source of sources) {
+    const match = source?.match(TICKET_KEY_RE);
+    if (match) return match[0];
+  }
+  return null;
+}
+
 export function mapReviewStates(states: string[]): ReviewStatus {
   if (states.includes('CHANGES_REQUESTED')) return 'changes_requested';
   if (states.includes('APPROVED')) return 'approved';
@@ -77,6 +91,100 @@ export async function getReviewStatus(
   return mapReviewStates(Array.from(latestByUser.values()));
 }
 
+export function normalizeMergeState(
+  rawState: string | null | undefined,
+  draft: boolean | null | undefined
+): MergeState {
+  if (draft) return 'draft';
+  switch (rawState) {
+    case 'clean':
+    case 'dirty':
+    case 'blocked':
+    case 'behind':
+    case 'unstable':
+    case 'draft':
+      return rawState;
+    default:
+      return 'unknown';
+  }
+}
+
+export async function getMergeState(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  number: number
+): Promise<MergeInfo> {
+  // mergeable_state is only populated on the single-PR endpoint, not on list/search.
+  const { data } = await octokit.rest.pulls.get({ owner, repo, pull_number: number });
+  const state = normalizeMergeState(data.mergeable_state, data.draft);
+  const detail =
+    state === 'blocked' || state === 'unstable'
+      ? await getMergeBlockDetail(octokit, owner, repo, data.head.sha, state)
+      : '';
+  return { state, detail, headRef: data.head.ref };
+}
+
+const FAILED_CONCLUSIONS = new Set(['failure', 'timed_out', 'cancelled', 'action_required']);
+
+// Names the specific failing/running checks behind a blocked/unstable state, e.g.
+// "Failing: build, lint". Empty string when nothing more specific can be determined.
+async function getMergeBlockDetail(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  ref: string,
+  state: MergeState
+): Promise<string> {
+  try {
+    const [checks, combined] = await Promise.all([
+      octokit.rest.checks.listForRef({ owner, repo, ref, per_page: 100 }),
+      octokit.rest.repos.getCombinedStatusForRef({ owner, repo, ref, per_page: 100 }),
+    ]);
+
+    const failing: string[] = [];
+    const running: string[] = [];
+    for (const run of checks.data.check_runs) {
+      if (run.status !== 'completed') running.push(run.name);
+      else if (run.conclusion && FAILED_CONCLUSIONS.has(run.conclusion)) failing.push(run.name);
+    }
+    for (const status of combined.data.statuses) {
+      if (status.state === 'failure' || status.state === 'error') failing.push(status.context);
+      else if (status.state === 'pending') running.push(status.context);
+    }
+
+    const parts: string[] = [];
+    if (failing.length) parts.push(`Failing: ${failing.join(', ')}`);
+    if (running.length) parts.push(`Running: ${running.join(', ')}`);
+    if (parts.length) return parts.join(' · ');
+    // Checks are green but GitHub still says blocked → the branch protection gate is review-side.
+    return state === 'blocked' ? 'Awaiting required approvals' : '';
+  } catch {
+    return ''; // detail is best-effort; fall back to the generic state label
+  }
+}
+
+// Human-readable "why can't this merge" reason. Empty string means nothing is blocking.
+export function describeMergeBlock(state: MergeState, detail = ''): string {
+  if (detail && state !== 'clean') return detail;
+  switch (state) {
+    case 'clean':
+      return '';
+    case 'dirty':
+      return 'Merge conflicts';
+    case 'blocked':
+      return 'Required checks/review not met';
+    case 'behind':
+      return 'Behind base branch';
+    case 'unstable':
+      return 'Checks failing';
+    case 'draft':
+      return 'Draft';
+    default:
+      return 'Computing…';
+  }
+}
+
 export async function getMyOpenPRs(octokit: Octokit, repos: RepoConfig[] = []): Promise<PRRow[]> {
   const repoQualifiers = repos.map((r) => ` repo:${r.owner}/${r.repo}`).join('');
   const { data } = await octokit.rest.search.issuesAndPullRequests({
@@ -88,7 +196,10 @@ export async function getMyOpenPRs(octokit: Octokit, repos: RepoConfig[] = []): 
   return Promise.all(
     data.items.map(async (item): Promise<PRRow> => {
       const { owner, repo } = parseRepoFromUrl(item.repository_url);
-      const reviewStatus = await getReviewStatus(octokit, owner, repo, item.number);
+      const [reviewStatus, merge] = await Promise.all([
+        getReviewStatus(octokit, owner, repo, item.number),
+        getMergeState(octokit, owner, repo, item.number),
+      ]);
       return {
         id: item.id,
         number: item.number,
@@ -99,6 +210,9 @@ export async function getMyOpenPRs(octokit: Octokit, repos: RepoConfig[] = []): 
         author: item.user?.login ?? 'unknown',
         createdAt: item.created_at,
         reviewStatus,
+        mergeState: merge.state,
+        mergeDetail: merge.detail,
+        ticketKey: extractTicketKey(merge.headRef, item.title),
       };
     })
   );
@@ -113,7 +227,10 @@ export async function getRepoOpenPRs(
 
   return Promise.all(
     data.map(async (pr): Promise<PRRow> => {
-      const reviewStatus = await getReviewStatus(octokit, owner, repo, pr.number);
+      const [reviewStatus, merge] = await Promise.all([
+        getReviewStatus(octokit, owner, repo, pr.number),
+        getMergeState(octokit, owner, repo, pr.number),
+      ]);
       return {
         id: pr.id,
         number: pr.number,
@@ -124,6 +241,9 @@ export async function getRepoOpenPRs(
         author: pr.user?.login ?? 'unknown',
         createdAt: pr.created_at,
         reviewStatus,
+        mergeState: merge.state,
+        mergeDetail: merge.detail,
+        ticketKey: extractTicketKey(merge.headRef, pr.title),
       };
     })
   );

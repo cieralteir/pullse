@@ -6,15 +6,19 @@ import {
   GithubTokenMissingError,
   GithubTokenInvalidError,
 } from '@/lib/github';
-import { readReposConfig, readMyPRsReposConfig } from '@/lib/repos-config';
+import { readReposConfig } from '@/lib/repos-config';
 import { describeSectionError } from '@/lib/errors';
-import { PRTable } from './components/PRTable';
+import { AutoRefresh } from './components/AutoRefresh';
+import { MyPRsTable } from './components/MyPRsTable';
 import { RefreshButton } from './components/RefreshButton';
 import { RepoTabs } from './components/RepoTabs';
 import { ModeToggle } from '@/components/mode-toggle';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type { PRRow } from '@/lib/github.types';
+
+// Data comes from live GitHub calls; never prerender/cache this route so Refresh re-fetches.
+export const dynamic = 'force-dynamic';
 
 interface SectionResult<T> {
   data: T | null;
@@ -66,10 +70,9 @@ export default async function Home() {
   }
 
   const { repos, error: reposError } = readReposConfig();
-  const { repos: myPRsRepos, error: myPRsReposError } = readMyPRsReposConfig();
 
   const [myPRsResult, ...repoResults] = await Promise.all([
-    loadSection<PRRow[]>(() => getMyOpenPRs(octokit, myPRsRepos)),
+    loadSection<PRRow[]>(() => getMyOpenPRs(octokit, repos)),
     ...repos.map((r) => loadSection<PRRow[]>(() => getRepoOpenPRs(octokit, r.owner, r.repo))),
   ]);
 
@@ -83,6 +86,7 @@ export default async function Home() {
         <h1 className="text-2xl font-semibold">pullse</h1>
         <div className="flex items-center gap-2">
           <ModeToggle />
+          <AutoRefresh />
           <RefreshButton />
         </div>
       </div>
@@ -95,17 +99,12 @@ export default async function Home() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {myPRsReposError && (
-            <Alert variant="destructive" role="alert" className="mb-3">
-              <AlertDescription>{myPRsReposError}</AlertDescription>
-            </Alert>
-          )}
           {myPRsResult.error && (
             <Alert variant="destructive" role="alert" className="mb-3">
               <AlertDescription>{myPRsResult.error}</AlertDescription>
             </Alert>
           )}
-          <PRTable rows={myPRs} showRepo />
+          <MyPRsTable rows={myPRs} repos={repos} />
         </CardContent>
       </Card>
 
